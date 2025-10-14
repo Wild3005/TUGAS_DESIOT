@@ -1,9 +1,5 @@
 #include <iostream>
 #include <string>
-#include <thread>
-#include <algorithm>
-#include <atomic>
-#include <chrono>
 
 #include <opencv2/opencv.hpp>
 #include <tesseract/baseapi.h>
@@ -16,15 +12,16 @@ const std::string TOPIC_RES("license/plate/response");
 
 class detect : public mqtt::callback{
     public:
-    detect(mqtt::async_client& cli) : client(cli), running(false){
+    detect(mqtt::async_client& cli) : client(cli){
             //Buka kamera
-            cap.open(PATH_CAM, cv::CAP_V4L2);
+            cv::VideoCapture cap(PATH_CAM, cv::CAP_V4L2);
             if (!cap.isOpened()) {
                 std::cerr << "Error: Could not open camera.\n";
                 return ;
             }
 
             //Inisialisasi Tesseract OCR
+            tesseract::TessBaseAPI ocr;
             if (ocr.Init(nullptr, "eng")) {
                 std::cerr << "Error: Could not initialize tesseract.\n";
                 return ;
@@ -42,78 +39,18 @@ class detect : public mqtt::callback{
     cv::VideoCapture cap;
     tesseract::TessBaseAPI ocr;
     mqtt::async_client& client;
-    std::atomic<bool> running;
-    std::thread worker;
 
     const std::string PATH_CAM = "/dev/v4l/by-id/usb-Generic_HP_TrueVision_HD_Camera_0001-video-index0";
 
-    void start();
-    void stop();
-    void single_capture();
-    void image_process(const cv::Mat& frame);
-
-    void message_arrived(mqtt::const_message_ptr msg) override;
-    void connection_lost(const std::string& cause) override;
+    void image_process(const mqtt::const_message_ptr msg);
 
 };
 
-void detect::connection_lost(const std::string& cause) {
-    std::cerr << "[MQTT] Connection lost: " << cause << std::endl;
-}
-
-void detect::message_arrived(mqtt::const_message_ptr msg) {
-    std::string payload = msg->to_string();
-    std::cout << "[MQTT] Received: " << payload << std::endl;
-
-    if (payload == "capture") {
-        single_capture();
-    } 
-    else if (payload == "start") {
-        start();
-    } 
-    else if (payload == "stop") {
-        stop();
-    }
-}
-
-void detect::start(){
-    if(running.load()) return;
-    running.store(true);
-
-    worker = std::thread([this](){
-        while (running.load())
-        {
-            cv::Mat frame;
-
-            if(!cap.isOpened()){
-                std::this_thread::sleep_for(std::chrono::milliseconds(200));
-                continue;
-            }
-            cap >> frame;
-            if (frame.empty()) continue;
-            image_process(frame);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-        }
-        
-    });
-}
-
-void detect::stop(){
-    if(!running.load()) return;
-    running.store(false);
-    if(worker.joinable()) worker.join();
-}
-
-void detect::single_capture(){
-    if (!cap.isOpened()) return;
+void detect::image_process(const mqtt::const_message_ptr msg){
     cv::Mat frame;
-    cap >> frame;
-    if (!frame.empty()) image_process(frame);
-}
+        cap >> frame;
+        if (frame.empty()) return;
 
-void detect::image_process(const cv::Mat& frame){
         cv::Mat gray, blurImg, edges;
         cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
         cv::GaussianBlur(gray, blurImg, cv::Size(5,5), 0);
@@ -158,17 +95,16 @@ void detect::image_process(const cv::Mat& frame){
                     std::cout << "Detected Plate: " << text << std::endl;
                     cv::putText(output, text, cv::Point(rect.x, rect.y - 5),
                                 cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0,0,255), 2);
-
-                    client.publish(TOPIC_RES, text,1,false); // publish
-                    
                 }
+
+                client.publish(TOPIC_RES, text,1,false); // publish
 
                 cv::imshow("Plate ROI", roiThresh);
             }
         }
 
         cv::imshow("Camera", output);
-        if (cv::waitKey(10) == 27) stop(); // tekan ESC untuk keluar
+        if (cv::waitKey(10) == 27) return; // tekan ESC untuk keluar
 
 }
 

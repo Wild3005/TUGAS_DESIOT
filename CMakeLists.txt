@@ -3,6 +3,9 @@ project(detect)
 
 find_package(OpenCV REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(PahoMqttCpp REQUIRED)
+
+
 pkg_check_modules(TESSERACT REQUIRED tesseract)
 
 include_directories(
@@ -16,4 +19,5 @@ target_link_libraries(detect
     ${TESSERACT_LIBRARIES}
     tesseract
     lept
+    PahoMqttCpp::paho-mqttpp3
 )
