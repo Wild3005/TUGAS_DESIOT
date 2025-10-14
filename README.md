@@ -18,3 +18,12 @@ konfigurasi pada .vscode
     ],
     "version": 4
 }
+
+
+# testing
+menggunakan 2 terminal 
+terminal 1:
+mosquitto_sub -h localhost -t license/plate/response
+
+terminal 2:
+mosquitto_pub -h localhost -t license/plate -m "start"
