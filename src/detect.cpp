@@ -9,7 +9,7 @@
 #include <tesseract/baseapi.h>
 #include <mqtt/client.h>
 
-const std::string SERVER_ADDRESS("tcp://broker.hivemq.com:1883");
+const std::string SERVER_ADDRESS("tcp://localhost:1883");
 const std::string CLIENT_ID("LicensePlateDetectorClient");
 const std::string TOPIC_REQ("license/plate");
 const std::string TOPIC_RES("license/plate/response");
@@ -45,7 +45,7 @@ class detect : public mqtt::callback{
     std::atomic<bool> running;
     std::thread worker;
 
-    const std::string PATH_CAM = "/dev/v4l/by-id/usb-Generic_HP_TrueVision_HD_Camera_0001-video-index0";
+    const std::string PATH_CAM = "/dev/v4l/by-id/usb-FLH-H62-200508_Integrated_Camera-video-index0";
 
     void start();
     void stop();
